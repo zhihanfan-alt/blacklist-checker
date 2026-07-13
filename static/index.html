@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>分拣员工黑名单检查器</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Microsoft YaHei','PingFang SC',system-ui,sans-serif;background:#f0f2f5;color:#1a1a2e;min-height:100vh}
+
+.header{background:#1a1a2e;color:#fff;padding:20px 0}
+.header-inner{max-width:1400px;margin:0 auto;padding:0 32px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.header h1{font-size:22px;font-weight:700}
+.header p{font-size:13px;color:#8892b0}
+.container{max-width:1400px;margin:0 auto;padding:24px 32px 60px}
+
+/* Cards */
+.card{background:#fff;border-radius:12px;padding:24px;border:1px solid #e8e8e8;margin-bottom:20px}
+.card h2{font-size:17px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.card h2 .count{background:#4361ee;color:#fff;font-size:12px;padding:2px 10px;border-radius:10px}
+
+/* Blacklist chips */
+.chips{display:flex;flex-wrap:wrap;gap:8px;min-height:36px;margin-bottom:16px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:#fee2e2;color:#dc3545;border-radius:8px;font-size:13px;font-weight:600}
+.chip .del{cursor:pointer;opacity:.6;font-size:16px;line-height:1}
+.chip .del:hover{opacity:1}
+.chips-empty{color:#9ca3af;font-size:14px;padding:8px 0}
+
+/* Blacklist input row */
+.bl-input-row{display:flex;gap:10px;flex-wrap:wrap}
+.bl-input-row input[type=text]{flex:1;min-width:200px;padding:10px 14px;border:2px solid #e8e8e8;border-radius:8px;font-size:14px;font-family:inherit}
+.bl-input-row input[type=text]:focus{outline:none;border-color:#4361ee}
+.btn{padding:10px 20px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s}
+.btn-primary{background:#4361ee;color:#fff}.btn-primary:hover{background:#3a56d4}
+.btn-danger{background:#dc3545;color:#fff}.btn-danger:hover{background:#c82333}
+.btn-success{background:#10b981;color:#fff}.btn-success:hover{background:#059669}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-sm{padding:6px 14px;font-size:13px}
+.upload-inline{position:relative;overflow:hidden;display:inline-block}
+.upload-inline input[type=file]{position:absolute;left:0;top:0;width:100%;height:100%;opacity:0;cursor:pointer}
+
+/* Schedule files */
+.file-list{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.file-item{display:flex;align-items:center;gap:12px;padding:10px 16px;background:#f8faff;border-radius:8px;border:1px solid #e8e8e8}
+.file-item .name{flex:1;font-size:14px;font-weight:500}
+.file-item .size{font-size:12px;color:#9ca3af}
+.file-item .del{cursor:pointer;color:#9ca3af;font-size:18px;line-height:1}.file-item .del:hover{color:#dc3545}
+.files-empty{color:#9ca3af;font-size:14px;padding:8px 0}
+.action-row{display:flex;gap:12px;flex-wrap:wrap}
+
+/* Stats grid */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.stat-card{background:#fff;border-radius:8px;padding:14px 18px;border-left:4px solid #e8e8e8}
+.stat-card.danger{border-color:#dc3545}.stat-card.success{border-color:#10b981}
+.stat-card.warn{border-color:#e67e22}.stat-card.info{border-color:#4361ee}
+.stat-label{font-size:12px;color:#6b7280;margin-bottom:2px}.stat-value{font-size:24px;font-weight:700}
+
+/* Result per file */
+.result-block{background:#fff;border-radius:12px;border:1px solid #e8e8e8;margin-bottom:16px;overflow:hidden}
+.result-header{padding:14px 20px;background:#fafafa;border-bottom:1px solid #e8e8e8;display:flex;align-items:center;justify-content:space-between;cursor:pointer}
+.result-header h3{font-size:15px;font-weight:600}
+.result-header .badge-ok{color:#10b981;font-weight:600;font-size:13px}
+.result-header .badge-warn{color:#dc3545;font-weight:600;font-size:13px}
+.result-body{display:none;padding:16px 20px}.result-body.open{display:block}
+
+/* Sheet tabs */
+.sheet-tabs{display:flex;gap:4px;margin-bottom:12px;flex-wrap:wrap}
+.sheet-tab{padding:6px 16px;border-radius:6px 6px 0 0;border:1px solid #e8e8e8;border-bottom:none;background:#f8f8f8;font-size:13px;cursor:pointer;font-weight:500}
+.sheet-tab.active{background:#fff;border-color:#4361ee;color:#4361ee;font-weight:600}
+.sheet-tab .sheet-match{background:#dc3545;color:#fff;font-size:11px;padding:1px 6px;border-radius:8px;margin-left:4px}
+
+/* Filter */
+.filter-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.filter-btn{padding:6px 14px;border-radius:16px;border:2px solid #e8e8e8;background:#fff;font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;font-family:inherit}
+.filter-btn:hover{border-color:#4361ee;color:#4361ee}
+.filter-btn.active{background:#4361ee;color:#fff;border-color:#4361ee}
+
+/* Table */
+.table-wrap{border:1px solid #e8e8e8;border-radius:8px;overflow:hidden;margin-bottom:12px}
+.table-scroll{overflow-x:auto;max-height:400px;overflow-y:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead{position:sticky;top:0;z-index:2}
+th{background:#1a1a2e;color:#fff;padding:10px 12px;text-align:left;font-weight:600;font-size:12px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.08)}
+td{padding:8px 12px;border-bottom:1px solid #f0f0f0;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis}
+tr:hover td{background:#f8faff}
+tr.matched-high td{background:#fee2e2!important}
+tr.matched-medium td{background:#fff7ed!important}
+tr.matched-fuzzy td{background:#fefce8!important}
+tr.matched-ngram td{background:#f5f3ff!important}
+td.match-cell{font-weight:700}
+td.match-cell.high{color:#dc3545}
+td.match-cell.medium{color:#ea580c}
+td.match-cell.low{color:#ca8a04}
+
+/* Match list */
+.match-list{list-style:none;max-height:300px;overflow-y:auto}
+.match-item{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #f0f0f0}
+.match-item .badge{padding:3px 10px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap}
+.badge.high{background:#fee2e2;color:#dc3545}.badge.medium{background:#fff7ed;color:#ea580c}
+.badge.fuzzy{background:#fefce8;color:#ca8a04}.badge.ngram{background:#f5f3ff;color:#7c3aed}
+.match-item .names{flex:1;font-size:13px}
+.match-item .names .arrow{color:#9ca3af;margin:0 6px}
+.match-item .meta{font-size:11px;color:#9ca3af;white-space:nowrap}
+.no-match-msg{text-align:center;padding:30px;color:#10b981;font-size:15px}
+
+/* Loading / Toast */
+.loading-overlay{display:none;position:fixed;inset:0;background:rgba(255,255,255,.85);z-index:100;align-items:center;justify-content:center;flex-direction:column}
+.loading-overlay.visible{display:flex}
+.spinner{width:44px;height:44px;border:4px solid #e8e8e8;border-top-color:#4361ee;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-overlay p{margin-top:14px;font-size:14px;color:#4361ee;font-weight:600}
+.toast{position:fixed;top:20px;right:20px;padding:12px 22px;border-radius:10px;color:#fff;font-size:14px;font-weight:500;z-index:200;opacity:0;transform:translateY(-10px);transition:all .3s}
+.toast.visible{opacity:1;transform:translateY(0)}
+.toast.error{background:#dc3545}.toast.success{background:#10b981}
+.footer{text-align:center;padding:20px;color:#9ca3af;font-size:12px}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <div>
+      <h1>分拣员工黑名单检查器</h1>
+      <p>批量检查排班表 · 多分表保留 · 6层匹配 · 导出标红Excel</p>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- 黑名单管理 -->
+  <div class="card">
+    <h2>&#128683; 黑名单管理 <span class="count" id="blCount">0</span></h2>
+    <div class="chips" id="blChips"><div class="chips-empty">暂无黑名单人员，请上传文件或手动添加</div></div>
+    <div class="bl-input-row">
+      <input type="text" id="blInput" placeholder="输入姓名，多个用逗号或换行分隔" onkeydown="if(event.key==='Enter')addBlacklist()">
+      <button class="btn btn-primary btn-sm" onclick="addBlacklist()">添加</button>
+      <div class="upload-inline">
+        <button class="btn btn-success btn-sm">&#128206; 上传Excel</button>
+        <input type="file" id="blFileInput" accept=".xlsx,.xls" onchange="uploadBlacklistFile()">
+      </div>
+      <button class="btn btn-danger btn-sm" onclick="clearBlacklist()">清空</button>
+    </div>
+  </div>
+
+  <!-- 排班表上传 -->
+  <div class="card">
+    <h2>&#128196; 排班表上传</h2>
+    <div class="file-list" id="fileList"><div class="files-empty">请选择排班表文件（支持多选）</div></div>
+    <div class="action-row">
+      <div class="upload-inline">
+        <button class="btn btn-primary">&#128206; 选择排班表</button>
+        <input type="file" id="scheduleInput" accept=".xlsx,.xls" multiple onchange="onScheduleSelect()">
+      </div>
+      <button class="btn btn-success" id="checkBtn" disabled onclick="runBatchCheck()">&#128270; 开始检查</button>
+      <button class="btn btn-success" id="exportBtn" disabled onclick="runBatchExport()">&#128229; 导出标红Excel（zip）</button>
+    </div>
+  </div>
+
+  <!-- 总览统计 -->
+  <div id="overviewStats" style="display:none">
+    <div class="stats" id="statsGrid"></div>
+  </div>
+
+  <!-- 检查结果 -->
+  <div id="resultsArea"></div>
+</div>
+
+<div class="footer">分拣员工黑名单检查器 — 6层匹配 · 多分表保留 · 批量导出</div>
+
+<div class="loading-overlay" id="loading"><div class="spinner"></div><p id="loadingText">正在检查...</p></div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ──
+let scheduleFiles = [];
+let batchResults = null;
+let currentSheetTabs = {};  // filename -> active sheet index
+
+// ── Blacklist ──
+async function loadBlacklist() {
+  const resp = await fetch("/api/blacklist");
+  const data = await resp.json();
+  renderChips(data.names);
+}
+
+function renderChips(names) {
+  const el = document.getElementById("blChips");
+  document.getElementById("blCount").textContent = names.length;
+  if (!names.length) {
+    el.innerHTML = '<div class="chips-empty">暂无黑名单人员，请上传文件或手动添加</div>';
+    return;
+  }
+  el.innerHTML = names.map(n =>
+    `<span class="chip">${esc(n)}<span class="del" onclick="removeBlacklist('${esc(n)}')">&times;</span></span>`
+  ).join("");
+}
+
+async function addBlacklist() {
+  const input = document.getElementById("blInput");
+  const name = input.value.trim();
+  if (!name) return;
+  const fd = new FormData();
+  fd.append("name", name);
+  const resp = await fetch("/api/blacklist/add", { method: "POST", body: fd });
+  const data = await resp.json();
+  if (data.ok) {
+    input.value = "";
+    renderChips(getCurrentNames().concat(data.added));
+    showToast(`已添加 ${data.added.length} 人${data.skipped ? `，跳过 ${data.skipped} 个重复` : ""}`, "success");
+    loadBlacklist();
+  }
+}
+
+async function uploadBlacklistFile() {
+  const file = document.getElementById("blFileInput").files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append("file", file);
+  const resp = await fetch("/api/blacklist/upload", { method: "POST", body: fd });
+  const data = await resp.json();
+  if (data.ok) {
+    document.getElementById("blFileInput").value = "";
+    showToast(`已添加 ${data.added.length} 人${data.skipped ? `，跳过 ${data.skipped} 个重复` : ""}`, "success");
+    loadBlacklist();
+  }
+}
+
+async function removeBlacklist(name) {
+  const fd = new FormData();
+  fd.append("name", name);
+  await fetch("/api/blacklist/remove", { method: "POST", body: fd });
+  loadBlacklist();
+}
+
+async function clearBlacklist() {
+  if (!confirm("确认清空全部黑名单？")) return;
+  await fetch("/api/blacklist/clear", { method: "POST" });
+  loadBlacklist();
+}
+
+function getCurrentNames() {
+  return [...document.querySelectorAll(".chip")].map(c => c.textContent.replace("×", "").trim());
+}
+
+// ── Schedule files ──
+function onScheduleSelect() {
+  const input = document.getElementById("scheduleInput");
+  for (const f of input.files) {
+    if (!scheduleFiles.some(s => s.name === f.name && s.size === f.size)) {
+      scheduleFiles.push(f);
+    }
+  }
+  input.value = "";
+  renderFileList();
+}
+
+function removeScheduleFile(idx) {
+  scheduleFiles.splice(idx, 1);
+  renderFileList();
+}
+
+function renderFileList() {
+  const el = document.getElementById("fileList");
+  document.getElementById("checkBtn").disabled = !scheduleFiles.length;
+  document.getElementById("exportBtn").disabled = !batchResults;
+  if (!scheduleFiles.length) {
+    el.innerHTML = '<div class="files-empty">请选择排班表文件（支持多选）</div>';
+    return;
+  }
+  el.innerHTML = scheduleFiles.map((f, i) =>
+    `<div class="file-item">
+      <span class="name">${esc(f.name)}</span>
+      <span class="size">${fmtSize(f.size)}</span>
+      <span class="del" onclick="removeScheduleFile(${i})">&times;</span>
+    </div>`
+  ).join("");
+}
+
+// ── Batch check ──
+async function runBatchCheck() {
+  if (!scheduleFiles.length) return;
+  showLoading("正在检查 " + scheduleFiles.length + " 个文件...");
+  const fd = new FormData();
+  scheduleFiles.forEach(f => fd.append("files", f));
+  try {
+    const resp = await fetch("/api/batch-check", { method: "POST", body: fd });
+    if (!resp.ok) throw new Error("服务器错误");
+    batchResults = await resp.json();
+    if (batchResults.error) { showToast(batchResults.error, "error"); return; }
+    renderBatchResults(batchResults);
+    document.getElementById("exportBtn").disabled = false;
+    const total = batchResults.results.reduce((s, r) => s + r.total_matches, 0);
+    showToast(
+      total > 0 ? `检查完成，共发现 ${total} 个匹配！` : "检查完成，未发现黑名单人员。",
+      total > 0 ? "error" : "success"
+    );
+  } catch (e) {
+    showToast("请求失败: " + e.message, "error");
+  } finally {
+    showLoading(false);
+  }
+}
+
+function renderBatchResults(data) {
+  // Overview stats
+  const totalScanned = data.results.reduce((s, r) => s + r.total_scanned, 0);
+  const totalMatches = data.results.reduce((s, r) => s + r.total_matches, 0);
+  const aggStats = { high: 0, medium: 0, fuzzy: 0, ngram: 0 };
+  data.results.forEach(r => { for (const k in aggStats) aggStats[k] += r.stats[k]; });
+
+  document.getElementById("overviewStats").style.display = "block";
+  document.getElementById("statsGrid").innerHTML = `
+    <div class="stat-card info"><div class="stat-label">扫描文件</div><div class="stat-value">${data.results.length}</div></div>
+    <div class="stat-card info"><div class="stat-label">扫描姓名</div><div class="stat-value">${totalScanned}</div></div>
+    <div class="stat-card danger"><div class="stat-label">匹配总数</div><div class="stat-value">${totalMatches}</div></div>
+    <div class="stat-card danger"><div class="stat-label">精确/倒序</div><div class="stat-value">${aggStats.high}</div></div>
+    <div class="stat-card warn"><div class="stat-label">Token包含</div><div class="stat-value">${aggStats.medium}</div></div>
+    <div class="stat-card success"><div class="stat-label">模糊</div><div class="stat-value">${aggStats.fuzzy}</div></div>
+    <div class="stat-card" style="border-color:#8b5cf6"><div class="stat-label">N-gram</div><div class="stat-value">${aggStats.ngram}</div></div>
+  `;
+
+  // Per-file results
+  const area = document.getElementById("resultsArea");
+  area.innerHTML = data.results.map((r, fi) => {
+    const hasMatch = r.total_matches > 0;
+    return `
+    <div class="result-block">
+      <div class="result-header" onclick="toggleResult(${fi})">
+        <h3>${esc(r.filename)} &mdash; ${r.sheets.length}个分表</h3>
+        <span class="${hasMatch ? 'badge-warn' : 'badge-ok'}">${hasMatch ? r.total_matches + ' 个匹配' : '全部通过'}</span>
+      </div>
+      <div class="result-body" id="rb-${fi}">
+        ${renderFileResult(r, fi)}
+      </div>
+    </div>`;
+  }).join("");
+
+  // Open first result with matches
+  const firstMatch = data.results.findIndex(r => r.total_matches > 0);
+  if (firstMatch >= 0) toggleResult(firstMatch);
+  else if (data.results.length) toggleResult(0);
+}
+
+function toggleResult(fi) {
+  const el = document.getElementById("rb-" + fi);
+  el.classList.toggle("open");
+}
+
+function renderFileResult(r, fi) {
+  if (r.sheets.length === 1) {
+    return renderSheetContent(r.sheets[0], fi, 0);
+  }
+  // Multiple sheets → tabs
+  currentSheetTabs[fi] = 0;
+  let html = '<div class="sheet-tabs">';
+  r.sheets.forEach((s, si) => {
+    const mc = s.total_matches;
+    html += `<span class="sheet-tab ${si===0?'active':''}" id="stab-${fi}-${si}" onclick="switchSheet(${fi},${si})">${esc(s.sheet_name)}${mc ? '<span class="sheet-match">'+mc+'</span>' : ''}</span>`;
+  });
+  html += '</div>';
+  r.sheets.forEach((s, si) => {
+    html += `<div id="scont-${fi}-${si}" style="display:${si===0?'block':'none'}">${renderSheetContent(s, fi, si)}</div>`;
+  });
+  return html;
+}
+
+function switchSheet(fi, si) {
+  const sheets = batchResults.results[fi].sheets;
+  sheets.forEach((_, i) => {
+    document.getElementById(`stab-${fi}-${i}`).classList.toggle("active", i === si);
+    document.getElementById(`scont-${fi}-${si}`).style.display = i === si ? "block" : "none";
+  });
+  currentSheetTabs[fi] = si;
+}
+
+function renderSheetContent(sheet, fi, si) {
+  const methodLabel = {exact:"精确",reversed:"倒序",nospace:"去空格",token_subset:"Token包含",fuzzy:"模糊",ngram:"N-gram聚合"};
+  if (!sheet.total_matches) {
+    return '<div class="no-match-msg">&#9989; 未发现黑名单人员</div>';
+  }
+
+  let html = `<div class="stats" style="margin-bottom:12px">
+    <div class="stat-card info"><div class="stat-label">扫描</div><div class="stat-value">${sheet.total_scanned}</div></div>
+    <div class="stat-card danger"><div class="stat-label">匹配</div><div class="stat-value">${sheet.total_matches}</div></div>
+  </div>`;
+
+  // Filter
+  html += `<div class="filter-bar">
+    <button class="filter-btn active" onclick="filterSheet(${fi},${si},'all',this)">全部</button>
+    <button class="filter-btn" onclick="filterSheet(${fi},${si},'high',this)">精确</button>
+    <button class="filter-btn" onclick="filterSheet(${fi},${si},'medium',this)">包含</button>
+    <button class="filter-btn" onclick="filterSheet(${fi},${si},'fuzzy',this)">模糊</button>
+    <button class="filter-btn" onclick="filterSheet(${fi},${si},'ngram',this)">N-gram</button>
+  </div>`;
+
+  // Table
+  const grid = sheet.grid;
+  const maxCol = batchResults.results[fi].max_col || 30;
+  const mc = sheet.matched_cells || {};
+  html += '<div class="table-wrap"><div class="table-scroll"><table><thead><tr><th>行</th>';
+  for (let c = 0; c < maxCol; c++) {
+    html += `<th>${grid[0] && grid[0][c] ? esc(grid[0][c]) : colLabel(c)}</th>`;
+  }
+  html += '</tr></thead><tbody>';
+  for (let r = 1; r < grid.length; r++) {
+    let rowConf = null, rowMethod = null;
+    for (let c = 0; c < maxCol; c++) {
+      const k = (r+1)+","+(c+1);
+      if (mc[k]) {
+        const m = mc[k];
+        if (m.confidence === "high" || (m.confidence === "medium" && rowConf !== "high") || (m.confidence === "low" && !rowConf)) {
+          rowConf = m.confidence; rowMethod = m.method;
+        }
+      }
+    }
+    const rc = rowConf ? "matched-" + (rowConf === "low" ? rowMethod : rowConf) : "";
+    html += `<tr class="${rc}" data-fi="${fi}" data-si="${si}"><td style="color:#9ca3af;font-size:11px">${r+1}</td>`;
+    for (let c = 0; c < maxCol; c++) {
+      const val = grid[r] && grid[r][c] ? grid[r][c] : "";
+      const k = (r+1)+","+(c+1);
+      const mi = mc[k];
+      if (mi) {
+        html += `<td class="match-cell ${mi.confidence}" title="匹配: ${esc(mi.blacklist_name)} (${Math.round(mi.score)}%)">${esc(val)} &#9888;</td>`;
+      } else {
+        html += `<td>${esc(val)}</td>`;
+      }
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table></div></div>';
+
+  // Match details
+  html += '<div style="margin-top:12px"><strong style="font-size:14px">匹配详情</strong><ul class="match-list">';
+  sheet.matches.sort((a,b) => b.score - a.score).forEach(m => {
+    const tag = m.confidence === "low" ? m.method : m.confidence;
+    const label = m.confidence === "low" ? (methodLabel[m.method]||m.method) : (methodLabel[m.method]||m.confidence);
+    html += `<li class="match-item" data-method="${tag}">
+      <span class="badge ${m.confidence}">${label} ${Math.round(m.score)}%</span>
+      <div class="names"><strong>${esc(m.schedule_name)}</strong><span class="arrow">&harr;</span><strong>${esc(m.blacklist_name)}</strong></div>
+      <div class="meta">${m.cell} · ${m.section}</div>
+    </li>`;
+  });
+  html += '</ul></div>';
+  return html;
+}
+
+function filterSheet(fi, si, filter, btn) {
+  const container = document.getElementById(`scont-${fi}-${si}`);
+  container.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  container.querySelectorAll(".match-item").forEach(el => {
+    el.style.display = (filter === "all" || el.dataset.method === filter) ? "" : "none";
+  });
+  container.querySelectorAll("tbody tr").forEach(tr => {
+    if (filter === "all") { tr.style.display = ""; }
+    else if (tr.classList.contains("matched-" + filter)) { tr.style.display = ""; }
+    else if (tr.className.match(/matched-/)) { tr.style.display = "none"; }
+    else { tr.style.display = ""; }
+  });
+}
+
+// ── Batch export ──
+async function runBatchExport() {
+  if (!scheduleFiles.length) return;
+  showLoading("正在生成标红Excel...");
+  const fd = new FormData();
+  scheduleFiles.forEach(f => fd.append("files", f));
+  try {
+    const resp = await fetch("/api/batch-export", { method: "POST", body: fd });
+    if (!resp.ok) throw new Error("导出失败");
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "黑名单检查结果.zip";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showToast("导出成功！", "success");
+  } catch (e) {
+    showToast("导出失败: " + e.message, "error");
+  } finally {
+    showLoading(false);
+  }
+}
+
+// ── Utils ──
+function esc(s) { return s ? String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;") : ""; }
+function fmtSize(b) { return b < 1024 ? b+"B" : b < 1048576 ? (b/1024).toFixed(1)+"KB" : (b/1048576).toFixed(1)+"MB"; }
+function colLabel(i) { let s=""; i++; while(i>0){i--;s=String.fromCharCode(65+(i%26))+s;i=Math.floor(i/26);} return s; }
+function showLoading(t) { document.getElementById("loadingText").textContent = t||"正在检查..."; document.getElementById("loading").classList.toggle("visible", !!t); if(t===false||t===undefined) document.getElementById("loading").classList.remove("visible"); }
+function showToast(msg, type) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.className = "toast " + type + " visible";
+  setTimeout(() => t.classList.remove("visible"), 3500);
+}
+
+// ── Init ──
+loadBlacklist();
+</script>
+</body>
+</html>
