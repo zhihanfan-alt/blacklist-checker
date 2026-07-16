@@ -1,5 +1,7 @@
 # Blacklist Checker / 分拣员工黑名单检查器
 
+**[Use Online / 在线使用](https://zhihanfan-alt.github.io/blacklist-checker/)** — no installation needed, runs in your browser
+
 A Python CLI tool that checks scheduling spreadsheets against an employee blacklist using **6-layer name matching**. Supports configurable column positions for different spreadsheet formats.
 
 ## Features
