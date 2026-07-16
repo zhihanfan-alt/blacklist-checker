@@ -37,6 +37,34 @@ pre { background:#f5f7fa; border-radius:8px; padding:16px; font-size:13px; line-
 footer { text-align:center; color:#999; font-size:13px; margin-top:32px; padding-bottom:20px; }
 footer a { color:#4361ee; text-decoration:none; }
 .badge { display:inline-block; background:#e8ecf4; border-radius:6px; padding:3px 8px; font-size:12px; color:#555; margin-left:6px; }
+.summary-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px; }
+.summary-item { text-align:center; padding:14px 8px; border-radius:10px; background:#f8f9fb; }
+.summary-item .num { font-size:28px; font-weight:700; }
+.summary-item .label { font-size:12px; color:#666; margin-top:2px; }
+.match-section { margin-bottom:20px; }
+.match-section h3 { font-size:15px; margin-bottom:10px; color:#333; }
+.match-table { width:100%; border-collapse:collapse; font-size:13px; }
+.match-table th { background:#f1f3f8; padding:8px 10px; text-align:left; font-weight:600; color:#555; border-bottom:2px solid #e2e5ed; }
+.match-table td { padding:8px 10px; border-bottom:1px solid #f0f0f0; vertical-align:middle; }
+.match-table tr:hover td { background:#f8f9fc; }
+.score-bar { display:flex; align-items:center; gap:6px; }
+.score-fill { height:6px; border-radius:3px; min-width:20px; }
+.method-tag { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; }
+.conf-high { background:#dcfce7; color:#166534; }
+.conf-medium { background:#fef9c3; color:#854d0e; }
+.conf-low { background:#fee2e2; color:#991b1b; }
+.m-exact { background:#dbeafe; color:#1e40af; }
+.m-reversed { background:#e0e7ff; color:#3730a3; }
+.m-nospace { background:#ede9fe; color:#5b21b6; }
+.m-token_subset { background:#fce7f3; color:#9d174d; }
+.m-fuzzy { background:#ffedd5; color:#9a3412; }
+.m-ngram { background:#f0fdf4; color:#166534; }
+.ok-files { margin-top:8px; }
+.ok-files h3 { font-size:15px; margin-bottom:8px; color:#333; }
+.ok-list { display:flex; flex-wrap:wrap; gap:6px; }
+.ok-tag { display:inline-flex; align-items:center; gap:4px; padding:4px 10px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:6px; font-size:12px; color:#166534; }
+.no-match-msg { text-align:center; padding:24px; color:#22c55e; font-size:16px; }
+.no-match-msg .big-check { font-size:40px; display:block; margin-bottom:8px; }
 </style>
 </head>
 <body>
@@ -85,7 +113,7 @@ footer a { color:#4361ee; text-decoration:none; }
 
   <div id="status">
     <h2>Results / 检查结果</h2>
-    <pre id="resultText"></pre>
+    <div id="resultContent"></div>
     <div id="downloadArea"></div>
   </div>
 
@@ -316,10 +344,10 @@ def generate_highlighted(path, sheets_result):
     if (!scInput.files.length) { alert("Please upload at least one schedule file"); return; }
 
     const statusEl = document.getElementById("status");
-    const resultEl = document.getElementById("resultText");
+    const resultEl = document.getElementById("resultContent");
     const downloadEl = document.getElementById("downloadArea");
     statusEl.style.display = "block";
-    resultEl.textContent = "Processing...";
+    resultEl.innerHTML = '<div style="text-align:center;padding:20px"><span class="spinner"></span> Checking...</div>';
     downloadEl.innerHTML = "";
 
     try {
@@ -351,8 +379,6 @@ from pathlib import Path
 load_config(${cfInput.files.length ? '"/config.json"' : "None"})
 
 bl = read_blacklist("/blacklist.xlsx")
-lines = [f"Blacklist: {len(bl)} entries\\n"]
-
 schedule_files = ${JSON.stringify(scheduleFiles)}
 all_results = []
 output_files = []
@@ -363,19 +389,11 @@ for sf in schedule_files:
     all_results.append(result)
     fname = sf["name"]
     if result["total_matches"] > 0:
-        lines.append(f"[MATCH] {fname}: {result['total_matches']} matches")
-        for sheet in result["sheets"]:
-            for m in sheet["matches"][:10]:
-                lines.append(f"  {m['cell']}: {m['schedule_name']} vs {m['blacklist_name']} ({m['score']}pts/{m['method']})")
-            if sheet["total_matches"] > 10:
-                lines.append(f"  ... +{sheet['total_matches'] - 10} more")
         hls = generate_highlighted(sf["path"], result["sheets"])
         out_name = Path(fname).stem + "_blacklist_check.xlsx"
         out_path = "/output/" + out_name
         with open(out_path, "wb") as f: f.write(hls)
         output_files.append({"path": out_path, "name": out_name})
-    else:
-        lines.append(f"[OK] {fname}: no matches")
 
 if ${minScore} > 0:
     for r in all_results:
@@ -386,8 +404,21 @@ if ${minScore} > 0:
 
 total = sum(r["total_matches"] for r in all_results)
 matched = sum(1 for r in all_results if r["total_matches"] > 0)
-lines.append(f"\\nTotal matches: {total}")
-lines.append(f"Files with matches: {matched}")
+
+# Build structured result
+matches_list = []
+for r in all_results:
+    for s in r["sheets"]:
+        for m in s["matches"]:
+            matches_list.append({"file": r["filename"], "cell": m["cell"], "section": m["section"],
+                "schedule": m["schedule_name"], "blacklist": m["blacklist_name"],
+                "score": m["score"], "confidence": m["confidence"], "method": m["method"]})
+
+ok_list = [r["filename"] for r in all_results if r["total_matches"] == 0]
+
+data = {"blacklist_count": len(bl), "files_checked": len(all_results),
+        "total_matches": total, "files_matched": matched,
+        "matches": matches_list, "ok_files": ok_list}
 
 download_data = None
 download_name = ""
@@ -400,11 +431,49 @@ elif len(output_files) > 1:
     download_data = Path(zip_path + ".zip").read_bytes()
     download_name = "blacklist_check_results.zip"
 
-json.dumps({"text": "\\n".join(lines), "download": download_data.hex() if download_data else "", "name": download_name})
+json.dumps({"data": data, "download": download_data.hex() if download_data else "", "name": download_name})
 `);
 
       const parsed = JSON.parse(result);
-      resultEl.textContent = parsed.text;
+      const d = parsed.data;
+
+      // Render summary cards
+      let html = '<div class="summary-grid">';
+      html += `<div class="summary-item"><div class="num">${d.blacklist_count}</div><div class="label">Blacklist / 黑名单</div></div>`;
+      html += `<div class="summary-item"><div class="num">${d.files_checked}</div><div class="label">Files Checked / 检查文件</div></div>`;
+      html += `<div class="summary-item"><div class="num">${d.total_matches}</div><div class="label">Matches / 匹配数</div></div>`;
+      html += `<div class="summary-item"><div class="num">${d.files_matched}</div><div class="label">Matched Files / 匹配文件</div></div>`;
+      html += '</div>';
+
+      if (d.matches.length > 0) {
+        html += '<div class="match-section"><h3>Match Details / 匹配详情</h3>';
+        html += '<div style="overflow-x:auto"><table class="match-table"><thead><tr>';
+        html += '<th>File / 文件</th><th>Cell</th><th>Section</th><th>Schedule / 排班</th><th></th>';
+        html += '<th>Blacklist / 黑名单</th><th>Score</th><th>Method</th></tr></thead><tbody>';
+        for (const m of d.matches) {
+          const confClass = 'conf-' + m.confidence;
+          const methodClass = 'm-' + m.method;
+          const barColor = m.score >= 95 ? '#22c55e' : m.score >= 85 ? '#eab308' : '#f97316';
+          html += `<tr><td class="file-cell">${m.file}</td><td class="cell-ref">${m.cell}</td>`;
+          html += `<td>${m.section}</td><td class="name-schedule">${m.schedule}</td>`;
+          html += `<td class="arrow-cell">&harr;</td><td class="name-blacklist">${m.blacklist}</td>`;
+          html += `<td><div class="score-bar"><div class="score-fill" style="width:${m.score}px;background:${barColor}"></div>${m.score}</div></td>`;
+          html += `<td><span class="method-tag ${confClass}">${m.method}</span></td></tr>`;
+        }
+        html += '</tbody></table></div></div>';
+      } else {
+        html += '<div class="no-match-msg"><span class="big-check">&#10003;</span>All clear! No blacklist matches found. / 全部通过，未发现黑名单匹配。</div>';
+      }
+
+      if (d.ok_files.length > 0) {
+        html += '<div class="ok-files"><h3>No Match Files / 无匹配文件</h3><div class="ok-list">';
+        for (const f of d.ok_files) {
+          html += `<span class="ok-tag">&#10003; ${f}</span>`;
+        }
+        html += '</div></div>';
+      }
+
+      resultEl.innerHTML = html;
 
       if (parsed.download) {
         const bytes = new Uint8Array(parsed.download.match(/.{1,2}/g).map(b => parseInt(b, 16)));
