@@ -355,6 +355,8 @@ lines = [f"Blacklist: {len(bl)} entries\\n"]
 
 schedule_files = ${JSON.stringify(scheduleFiles)}
 all_results = []
+output_files = []
+Path("/output").mkdir(exist_ok=True)
 
 for sf in schedule_files:
     result = check_workbook(sf["path"], bl)
@@ -368,9 +370,10 @@ for sf in schedule_files:
             if sheet["total_matches"] > 10:
                 lines.append(f"  ... +{sheet['total_matches'] - 10} more")
         hls = generate_highlighted(sf["path"], result["sheets"])
-        out = "/output/" + Path(fname).stem + "_blacklist_check.xlsx"
-        Path("/output").mkdir(exist_ok=True)
-        with open(out, "wb") as f: f.write(hls)
+        out_name = Path(fname).stem + "_blacklist_check.xlsx"
+        out_path = "/output/" + out_name
+        with open(out_path, "wb") as f: f.write(hls)
+        output_files.append({"path": out_path, "name": out_name})
     else:
         lines.append(f"[OK] {fname}: no matches")
 
@@ -386,16 +389,12 @@ matched = sum(1 for r in all_results if r["total_matches"] > 0)
 lines.append(f"\\nTotal matches: {total}")
 lines.append(f"Files with matches: {matched}")
 
-# Prepare download
-out_files = ["/output/" + Path(sf["name"]).stem + "_blacklist_check.xlsx"
-             for sf in schedule_files if any(r["filename"] == sf["name"] and r["total_matches"] > 0 for r in all_results)]
-
 download_data = None
 download_name = ""
-if len(out_files) == 1:
-    download_data = Path(out_files[0]).read_bytes()
-    download_name = Path(out_files[0]).name
-elif len(out_files) > 1:
+if len(output_files) == 1:
+    download_data = Path(output_files[0]["path"]).read_bytes()
+    download_name = output_files[0]["name"]
+elif len(output_files) > 1:
     zip_path = "/output/results"
     shutil.make_archive(zip_path, "zip", "/output")
     download_data = Path(zip_path + ".zip").read_bytes()
