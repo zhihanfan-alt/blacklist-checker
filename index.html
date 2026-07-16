@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blacklist Checker / 黑名单检查器</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:#f5f7fa; color:#1a1a2e; min-height:100vh; }
+.container { max-width:800px; margin:0 auto; padding:24px 16px; }
+h1 { font-size:28px; text-align:center; margin-bottom:6px; }
+.subtitle { text-align:center; color:#666; margin-bottom:28px; font-size:15px; }
+.card { background:#fff; border-radius:12px; padding:24px; margin-bottom:20px; box-shadow:0 2px 8px rgba(0,0,0,.06); }
+.card h2 { font-size:18px; margin-bottom:16px; color:#1a1a2e; }
+.upload-area { border:2px dashed #ccc; border-radius:10px; padding:28px; text-align:center; cursor:pointer; transition:all .2s; }
+.upload-area:hover,.upload-area.dragover { border-color:#4361ee; background:#f0f4ff; }
+.upload-area p { margin:6px 0; }
+.upload-area .hint { font-size:13px; color:#888; }
+.upload-area .files { font-size:14px; color:#4361ee; margin-top:10px; font-weight:500; }
+input[type=file] { display:none; }
+.row { display:flex; gap:16px; }
+.row .card { flex:1; }
+.slider-group { margin-top:12px; }
+.slider-group label { display:flex; justify-content:space-between; font-size:14px; margin-bottom:6px; }
+input[type=range] { width:100%; }
+.btn { display:block; width:100%; padding:16px; border:none; border-radius:10px; font-size:18px; font-weight:600; cursor:pointer; transition:all .2s; background:#4361ee; color:#fff; }
+.btn:hover { background:#3a56d4; }
+.btn:disabled { background:#ccc; cursor:not-allowed; }
+#status { background:#fff; border-radius:12px; padding:20px 24px; margin-top:20px; box-shadow:0 2px 8px rgba(0,0,0,.06); display:none; }
+#status h2 { font-size:16px; margin-bottom:10px; }
+#loading { text-align:center; padding:20px; color:#666; display:none; }
+.spinner { display:inline-block; width:20px; height:20px; border:3px solid #ddd; border-top-color:#4361ee; border-radius:50%; animation:spin 1s linear infinite; vertical-align:middle; margin-right:8px; }
+@keyframes spin { to { transform:rotate(360deg); } }
+pre { background:#f5f7fa; border-radius:8px; padding:16px; font-size:13px; line-height:1.6; overflow-x:auto; white-space:pre-wrap; word-break:break-all; }
+.download-link { display:inline-block; margin-top:12px; padding:10px 20px; background:#22c55e; color:#fff; border-radius:8px; text-decoration:none; font-weight:600; }
+.download-link:hover { background:#16a34a; }
+footer { text-align:center; color:#999; font-size:13px; margin-top:32px; padding-bottom:20px; }
+footer a { color:#4361ee; text-decoration:none; }
+.badge { display:inline-block; background:#e8ecf4; border-radius:6px; padding:3px 8px; font-size:12px; color:#555; margin-left:6px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Blacklist Checker <span class="badge">v1.0</span></h1>
+  <p class="subtitle">分拣员工黑名单检查器 — 6-layer name matching, runs entirely in your browser</p>
+
+  <div class="row">
+    <div class="card">
+      <h2>1. Blacklist / 黑名单</h2>
+      <div class="upload-area" id="blacklistArea">
+        <p>Drop or click to upload</p>
+        <p class="hint">Excel (.xlsx) — column A = names, row 1 = header</p>
+        <div class="files" id="blacklistName"></div>
+      </div>
+      <input type="file" id="blacklistInput" accept=".xlsx">
+    </div>
+    <div class="card">
+      <h2>2. Schedules / 排班表</h2>
+      <div class="upload-area" id="scheduleArea">
+        <p>Drop or click to upload (multiple files)</p>
+        <p class="hint">Excel (.xlsx) — names in columns 1,4,8,11,15,19,23,28</p>
+        <div class="files" id="scheduleNames"></div>
+      </div>
+      <input type="file" id="scheduleInput" accept=".xlsx" multiple>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>3. Options</h2>
+    <div class="upload-area" id="configArea" style="padding:16px">
+      <p>Config file (optional) / 配置文件（可选）</p>
+      <p class="hint">JSON — custom column positions, thresholds</p>
+      <div class="files" id="configName"></div>
+    </div>
+    <input type="file" id="configInput" accept=".json">
+    <div class="slider-group">
+      <label><span>Min match score / 最低匹配分数</span><span id="scoreVal">0</span></label>
+      <input type="range" id="minScore" min="0" max="100" step="5" value="0">
+    </div>
+  </div>
+
+  <button class="btn" id="checkBtn" disabled>Check / 开始检查</button>
+
+  <div id="loading"><span class="spinner"></span> Loading Python runtime (first visit ~15s)...</div>
+
+  <div id="status">
+    <h2>Results / 检查结果</h2>
+    <pre id="resultText"></pre>
+    <div id="downloadArea"></div>
+  </div>
+
+  <footer>
+    <a href="https://github.com/zhihanfan-alt/blacklist-checker">GitHub</a> &middot;
+    Runs entirely in your browser — no data is uploaded to any server / 所有处理在浏览器内完成，数据不会上传到任何服务器
+  </footer>
+</div>
+
+<script type="module">
+  // ── Pyodide loader ──────────────────────────────────────
+  const script = document.createElement("script");
+  script.src = "https://cdn.jsdelivr.net/pyodide/v0.25.1/full/pyodide.js";
+  document.head.appendChild(script);
+
+  let pyodide = null;
+  let ready = false;
+
+  const checkerCode = `
+import io, json, re, sys
+from pathlib import Path
+import openpyxl
+from openpyxl.styles import Font, PatternFill
+from rapidfuzz import fuzz
+from unidecode import unidecode
+
+DEFAULT_CONFIG = {
+    "name_columns": [1, 4, 8, 11, 15, 19, 23, 28],
+    "sections": {
+        "1": "Escaneadoras", "4": "Mesas", "8": "Name List",
+        "11": "Name/Time1", "15": "Name/Time2", "19": "Morning List",
+        "23": "Name3", "28": "Name4",
+    },
+    "fuzzy_threshold": 85,
+    "ngram_threshold": 0.70,
+    "blacklist_sheet": "黑名单",
+}
+_cfg = dict(DEFAULT_CONFIG)
+
+def load_config(path=None):
+    global _cfg
+    _cfg = dict(DEFAULT_CONFIG)
+    if path:
+        with open(path, encoding="utf-8") as f:
+            _cfg.update(json.load(f))
+    return _cfg
+
+def _norm(name):
+    name = name.strip().lower()
+    name = unidecode(name)
+    name = re.sub(r"[^\\w\\s]", "", name)
+    return re.sub(r"\\s+", " ", name).strip()
+
+def ngram_sim(a, b):
+    def ng(s, n): return {s[i:i+n] for i in range(len(s) - n + 1)}
+    ba, bb = ng(a, 2), ng(b, 2)
+    ta, tb = ng(a, 3), ng(b, 3)
+    bs = len(ba & bb) / len(ba | bb) if (ba | bb) else 0
+    ts = len(ta & tb) / len(ta | tb) if (ta | tb) else 0
+    return (bs + ts) / 2
+
+def match_score(sched, bl):
+    if not sched or not bl: return 0, "", ""
+    a, b = _norm(sched), _norm(bl)
+    if not a or not b: return 0, "", ""
+    if a == b: return 100, "high", "exact"
+    ta, tb = a.split(), b.split()
+    sa, sb = " ".join(sorted(ta)), " ".join(sorted(tb))
+    if sa == sb: return 99, "high", "reversed"
+    if a.replace(" ", "") == b.replace(" ", ""): return 98, "high", "nospace"
+    sa_set, sb_set = set(ta), set(tb)
+    shorter = sa_set if len(sa_set) <= len(sb_set) else sb_set
+    longer = sb_set if len(sa_set) <= len(sb_set) else sa_set
+    if shorter.issubset(longer) and len(shorter) >= 2: return 95, "medium", "token_subset"
+    ratio = fuzz.ratio(sa, sb)
+    if ratio >= _cfg["fuzzy_threshold"]: return ratio, "low", "fuzzy"
+    st = ta if len(ta) <= len(tb) else tb
+    lt = tb if len(ta) <= len(tb) else ta
+    matched = sum(1 for s in st if any(ngram_sim(s, l) >= _cfg["ngram_threshold"] for l in lt))
+    total = len(st)
+    if total > 0 and matched >= max(2, total * 0.5): return int(80 + (matched / total) * 9), "low", "ngram"
+    return 0, "", ""
+
+def read_blacklist(path, sheet_name=None):
+    wb = openpyxl.load_workbook(path, data_only=True)
+    target = sheet_name or _cfg.get("blacklist_sheet", "黑名单")
+    ws = wb[target] if target in wb.sheetnames else wb.active
+    names = []
+    for row in ws.iter_rows(min_row=2, max_col=1, values_only=True):
+        v = row[0]
+        if v and str(v).strip(): names.append(str(v).strip())
+    wb.close()
+    return names
+
+def scan_sheet(ws, max_col):
+    columns = _cfg["name_columns"]
+    sections = {int(k): v for k, v in _cfg["sections"].items()}
+    name_cells = []
+    for col_idx in columns:
+        if col_idx > max_col: continue
+        section = sections.get(col_idx, f"Col{col_idx}")
+        for row_idx in range(1, ws.max_row):
+            val = ws.cell(row=row_idx + 1, column=col_idx).value
+            if val and len(str(val).strip()) > 1:
+                name_cells.append({"row": row_idx + 1, "col": col_idx, "name": str(val).strip(), "section": section})
+    return name_cells
+
+def check_workbook(path, bl):
+    wb = openpyxl.load_workbook(path, data_only=True)
+    max_col = min(max(ws.max_column for ws in wb.worksheets), 30)
+    sheets = []
+    total_scanned = total_matches = 0
+    for ws in wb.worksheets:
+        name_cells = scan_sheet(ws, max_col)
+        matches = []
+        for cell in name_cells:
+            best_score, best_conf, best_method, best_bl = 0, "", "", ""
+            for bn in bl:
+                s, c, m = match_score(cell["name"], bn)
+                if s > best_score: best_score, best_conf, best_method, best_bl = s, c, m, bn
+            if best_score > 0:
+                matches.append({"row": cell["row"], "col": cell["col"],
+                    "cell": openpyxl.utils.get_column_letter(cell["col"]) + str(cell["row"]),
+                    "schedule_name": cell["name"], "blacklist_name": best_bl,
+                    "score": best_score, "confidence": best_conf, "method": best_method, "section": cell["section"]})
+        sheets.append({"sheet_name": ws.title, "total_scanned": len(name_cells), "total_matches": len(matches), "matches": matches})
+        total_scanned += len(name_cells)
+        total_matches += len(matches)
+    wb.close()
+    return {"filename": Path(path).name, "filepath": path, "total_scanned": total_scanned, "total_matches": total_matches, "sheets": sheets}
+
+def generate_highlighted(path, sheets_result):
+    wb = openpyxl.load_workbook(path)
+    red_font = Font(color="FF0000", bold=True)
+    red_fill = PatternFill(start_color="FFCCCC", end_color="FFCCCC", fill_type="solid")
+    summary_done = False
+    for sr in sheets_result:
+        if sr["sheet_name"] not in wb.sheetnames: continue
+        ws = wb[sr["sheet_name"]]
+        for m in sr["matches"]:
+            cell = ws.cell(row=m["row"], col=m["col"])
+            cell.font = red_font
+            cell.fill = red_fill
+        if not summary_done and sr["total_matches"] > 0:
+            ws.insert_rows(1)
+            ws.cell(row=1, column=1,
+                value=f"Blacklist matches: {sr['total_matches']} found").font = Font(color="FF0000", bold=True, size=12)
+            summary_done = True
+    buf = io.BytesIO()
+    wb.save(buf)
+    wb.close()
+    return buf.getvalue()
+`;
+
+  script.onload = async () => {
+    const loadingEl = document.getElementById("loading");
+    loadingEl.style.display = "block";
+    try {
+      pyodide = await loadPyodide();
+      await pyodide.loadPackage("micropip");
+      const micropip = pyodide.pyimport("micropip");
+      await Promise.all([
+        micropip.install("openpyxl"),
+        micropip.install("rapidfuzz"),
+        micropip.install("unidecode"),
+      ]);
+      pyodide.runPython(checkerCode);
+      ready = true;
+      document.getElementById("checkBtn").disabled = false;
+      loadingEl.innerHTML = '<span style="color:#22c55e">Ready / 就绪</span>';
+      setTimeout(() => loadingEl.style.display = "none", 2000);
+    } catch (e) {
+      loadingEl.innerHTML = '<span style="color:#ef4444">Failed to load: ' + e.message + '</span>';
+    }
+  };
+
+  // ── UI wiring ───────────────────────────────────────────
+  function wireUpload(areaId, inputId, nameId, isMulti) {
+    const area = document.getElementById(areaId);
+    const input = document.getElementById(inputId);
+    const nameEl = document.getElementById(nameId);
+    area.addEventListener("click", () => input.click());
+    area.addEventListener("dragover", e => { e.preventDefault(); area.classList.add("dragover"); });
+    area.addEventListener("dragleave", () => area.classList.remove("dragover"));
+    area.addEventListener("drop", e => {
+      e.preventDefault(); area.classList.remove("dragover");
+      input.files = e.dataTransfer.files;
+      input.dispatchEvent(new Event("change"));
+    });
+    input.addEventListener("change", () => {
+      if (!input.files.length) return;
+      if (isMulti) {
+        nameEl.textContent = Array.from(input.files).map(f => f.name).join(", ");
+      } else {
+        nameEl.textContent = input.files[0].name;
+      }
+    });
+  }
+  wireUpload("blacklistArea", "blacklistInput", "blacklistName", false);
+  wireUpload("scheduleArea", "scheduleInput", "scheduleNames", true);
+  wireUpload("configArea", "configInput", "configName", false);
+
+  document.getElementById("minScore").addEventListener("input", e => {
+    document.getElementById("scoreVal").textContent = e.target.value;
+  });
+
+  // ── Check button ────────────────────────────────────────
+  document.getElementById("checkBtn").addEventListener("click", async () => {
+    if (!ready) return;
+    const blInput = document.getElementById("blacklistInput");
+    const scInput = document.getElementById("scheduleInput");
+    const cfInput = document.getElementById("configInput");
+
+    if (!blInput.files.length) { alert("Please upload a blacklist file"); return; }
+    if (!scInput.files.length) { alert("Please upload at least one schedule file"); return; }
+
+    const statusEl = document.getElementById("status");
+    const resultEl = document.getElementById("resultText");
+    const downloadEl = document.getElementById("downloadArea");
+    statusEl.style.display = "block";
+    resultEl.textContent = "Processing...";
+    downloadEl.innerHTML = "";
+
+    try {
+      // Write blacklist file
+      const blData = new Uint8Array(await blInput.files[0].arrayBuffer());
+      pyodide.FS.writeFile("/blacklist.xlsx", blData);
+
+      // Write schedule files
+      const scheduleFiles = [];
+      for (let i = 0; i < scInput.files.length; i++) {
+        const fname = `/schedule_${i}.xlsx`;
+        pyodide.FS.writeFile(fname, new Uint8Array(await scInput.files[i].arrayBuffer()));
+        scheduleFiles.push({path: fname, name: scInput.files[i].name});
+      }
+
+      // Write config if provided
+      if (cfInput.files.length) {
+        const cData = new TextDecoder().decode(new Uint8Array(await cfInput.files[0].arrayBuffer()));
+        pyodide.FS.writeFile("/config.json", cData);
+      }
+
+      const minScore = parseInt(document.getElementById("minScore").value) || 0;
+
+      // Run checker
+      const result = pyodide.runPython(`
+import json, shutil
+from pathlib import Path
+
+load_config(${cfInput.files.length ? '"/config.json"' : "None"})
+
+bl = read_blacklist("/blacklist.xlsx")
+lines = [f"Blacklist: {len(bl)} entries\\n"]
+
+schedule_files = ${JSON.stringify(scheduleFiles)}
+all_results = []
+
+for sf in schedule_files:
+    result = check_workbook(sf["path"], bl)
+    all_results.append(result)
+    fname = sf["name"]
+    if result["total_matches"] > 0:
+        lines.append(f"[MATCH] {fname}: {result['total_matches']} matches")
+        for sheet in result["sheets"]:
+            for m in sheet["matches"][:10]:
+                lines.append(f"  {m['cell']}: {m['schedule_name']} vs {m['blacklist_name']} ({m['score']}pts/{m['method']})")
+            if sheet["total_matches"] > 10:
+                lines.append(f"  ... +{sheet['total_matches'] - 10} more")
+        hls = generate_highlighted(sf["path"], result["sheets"])
+        out = "/output/" + Path(fname).stem + "_blacklist_check.xlsx"
+        Path("/output").mkdir(exist_ok=True)
+        with open(out, "wb") as f: f.write(hls)
+    else:
+        lines.append(f"[OK] {fname}: no matches")
+
+if ${minScore} > 0:
+    for r in all_results:
+        for s in r["sheets"]:
+            s["matches"] = [m for m in s["matches"] if m["score"] >= ${minScore}]
+            s["total_matches"] = len(s["matches"])
+        r["total_matches"] = sum(s["total_matches"] for s in r["sheets"])
+
+total = sum(r["total_matches"] for r in all_results)
+matched = sum(1 for r in all_results if r["total_matches"] > 0)
+lines.append(f"\\nTotal matches: {total}")
+lines.append(f"Files with matches: {matched}")
+
+# Prepare download
+out_files = ["/output/" + Path(sf["name"]).stem + "_blacklist_check.xlsx"
+             for sf in schedule_files if any(r["filename"] == sf["name"] and r["total_matches"] > 0 for r in all_results)]
+
+download_data = None
+download_name = ""
+if len(out_files) == 1:
+    download_data = Path(out_files[0]).read_bytes()
+    download_name = Path(out_files[0]).name
+elif len(out_files) > 1:
+    zip_path = "/output/results"
+    shutil.make_archive(zip_path, "zip", "/output")
+    download_data = Path(zip_path + ".zip").read_bytes()
+    download_name = "blacklist_check_results.zip"
+
+json.dumps({"text": "\\n".join(lines), "download": download_data.hex() if download_data else "", "name": download_name})
+`);
+
+      const parsed = JSON.parse(result);
+      resultEl.textContent = parsed.text;
+
+      if (parsed.download) {
+        const bytes = new Uint8Array(parsed.download.match(/.{1,2}/g).map(b => parseInt(b, 16)));
+        const blob = new Blob([bytes], {type: "application/octet-stream"});
+        const url = URL.createObjectURL(blob);
+        downloadEl.innerHTML = `<a class="download-link" href="${url}" download="${parsed.name}">Download ${parsed.name}</a>`;
+      }
+    } catch (e) {
+      resultEl.textContent = "Error: " + e.message;
+    }
+  });
+</script>
+</body>
+</html>
