@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Blacklist Checker / 黑名单检查器</title>
+<title>黑名单检查器</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:#f5f7fa; color:#1a1a2e; min-height:100vh; }
@@ -69,24 +69,24 @@ footer a { color:#4361ee; text-decoration:none; }
 </head>
 <body>
 <div class="container">
-  <h1>Blacklist Checker <span class="badge">v1.0</span></h1>
-  <p class="subtitle">分拣员工黑名单检查器 — 6-layer name matching, runs entirely in your browser</p>
+  <h1>黑名单检查器 <span class="badge">v1.0</span></h1>
+  <p class="subtitle">6层名称匹配 · 浏览器本地运行 · 数据不上传</p>
 
   <div class="row">
     <div class="card">
-      <h2>1. Blacklist / 黑名单</h2>
+      <h2>1. 上传黑名单</h2>
       <div class="upload-area" id="blacklistArea">
-        <p>Drop or click to upload</p>
-        <p class="hint">Excel (.xlsx) — column A = names, row 1 = header</p>
+        <p>点击或拖拽上传</p>
+        <p class="hint">Excel (.xlsx) — A列 = 姓名，第1行 = 表头</p>
         <div class="files" id="blacklistName"></div>
       </div>
       <input type="file" id="blacklistInput" accept=".xlsx">
     </div>
     <div class="card">
-      <h2>2. Schedules / 排班表</h2>
+      <h2>2. 上传排班表</h2>
       <div class="upload-area" id="scheduleArea">
-        <p>Drop or click to upload (multiple files)</p>
-        <p class="hint">Excel (.xlsx) — names in columns 1,4,8,11,15,19,23,28</p>
+        <p>点击或拖拽上传（支持多文件）</p>
+        <p class="hint">Excel (.xlsx) — 扫描列 1, 4, 8, 11, 15, 19, 23, 28</p>
         <div class="files" id="scheduleNames"></div>
       </div>
       <input type="file" id="scheduleInput" accept=".xlsx" multiple>
@@ -94,32 +94,32 @@ footer a { color:#4361ee; text-decoration:none; }
   </div>
 
   <div class="card">
-    <h2>3. Options</h2>
+    <h2>3. 选项</h2>
     <div class="upload-area" id="configArea" style="padding:16px">
-      <p>Config file (optional) / 配置文件（可选）</p>
-      <p class="hint">JSON — custom column positions, thresholds</p>
+      <p>配置文件（可选）</p>
+      <p class="hint">JSON 格式 — 自定义扫描列位置、匹配阈值</p>
       <div class="files" id="configName"></div>
     </div>
     <input type="file" id="configInput" accept=".json">
     <div class="slider-group">
-      <label><span>Min match score / 最低匹配分数</span><span id="scoreVal">0</span></label>
+      <label><span>最低匹配分数</span><span id="scoreVal">0</span></label>
       <input type="range" id="minScore" min="0" max="100" step="5" value="0">
     </div>
   </div>
 
-  <button class="btn" id="checkBtn" disabled>Check / 开始检查</button>
+  <button class="btn" id="checkBtn" disabled>开始检查</button>
 
-  <div id="loading"><span class="spinner"></span> Loading Python runtime (first visit ~15s)...</div>
+  <div id="loading"><span class="spinner"></span> 正在加载运行环境（首次约15秒）...</div>
 
   <div id="status">
-    <h2>Results / 检查结果</h2>
+    <h2>检查结果</h2>
     <div id="resultContent"></div>
     <div id="downloadArea"></div>
   </div>
 
   <footer>
     <a href="https://github.com/zhihanfan-alt/blacklist-checker">GitHub</a> &middot;
-    Runs entirely in your browser — no data is uploaded to any server / 所有处理在浏览器内完成，数据不会上传到任何服务器
+    所有处理在浏览器内完成，数据不会上传到任何服务器
   </footer>
 </div>
 
@@ -296,7 +296,7 @@ def generate_highlighted(path, sheets_result):
       pyodide.runPython(checkerCode);
       ready = true;
       document.getElementById("checkBtn").disabled = false;
-      loadingEl.innerHTML = '<span style="color:#22c55e">Ready / 就绪</span>';
+      loadingEl.innerHTML = '<span style="color:#22c55e">就绪</span>';
       setTimeout(() => loadingEl.style.display = "none", 2000);
     } catch (e) {
       loadingEl.innerHTML = '<span style="color:#ef4444">Failed to load: ' + e.message + '</span>';
@@ -340,14 +340,14 @@ def generate_highlighted(path, sheets_result):
     const scInput = document.getElementById("scheduleInput");
     const cfInput = document.getElementById("configInput");
 
-    if (!blInput.files.length) { alert("Please upload a blacklist file"); return; }
-    if (!scInput.files.length) { alert("Please upload at least one schedule file"); return; }
+    if (!blInput.files.length) { alert("请上传黑名单文件"); return; }
+    if (!scInput.files.length) { alert("请上传至少一个排班表文件"); return; }
 
     const statusEl = document.getElementById("status");
     const resultEl = document.getElementById("resultContent");
     const downloadEl = document.getElementById("downloadArea");
     statusEl.style.display = "block";
-    resultEl.innerHTML = '<div style="text-align:center;padding:20px"><span class="spinner"></span> Checking...</div>';
+    resultEl.innerHTML = '<div style="text-align:center;padding:20px"><span class="spinner"></span> 检查中...</div>';
     downloadEl.innerHTML = "";
 
     try {
@@ -439,34 +439,35 @@ json.dumps({"data": data, "download": download_data.hex() if download_data else 
 
       // Render summary cards
       let html = '<div class="summary-grid">';
-      html += `<div class="summary-item"><div class="num">${d.blacklist_count}</div><div class="label">Blacklist / 黑名单</div></div>`;
-      html += `<div class="summary-item"><div class="num">${d.files_checked}</div><div class="label">Files Checked / 检查文件</div></div>`;
-      html += `<div class="summary-item"><div class="num">${d.total_matches}</div><div class="label">Matches / 匹配数</div></div>`;
-      html += `<div class="summary-item"><div class="num">${d.files_matched}</div><div class="label">Matched Files / 匹配文件</div></div>`;
+      html += `<div class="summary-item"><div class="num">${d.blacklist_count}</div><div class="label">黑名单人数</div></div>`;
+      html += `<div class="summary-item"><div class="num">${d.files_checked}</div><div class="label">检查文件</div></div>`;
+      html += `<div class="summary-item"><div class="num">${d.total_matches}</div><div class="label">匹配数</div></div>`;
+      html += `<div class="summary-item"><div class="num">${d.files_matched}</div><div class="label">命中文件</div></div>`;
       html += '</div>';
 
       if (d.matches.length > 0) {
-        html += '<div class="match-section"><h3>Match Details / 匹配详情</h3>';
+        html += '<div class="match-section"><h3>匹配详情</h3>';
         html += '<div style="overflow-x:auto"><table class="match-table"><thead><tr>';
-        html += '<th>File / 文件</th><th>Cell</th><th>Section</th><th>Schedule / 排班</th><th></th>';
-        html += '<th>Blacklist / 黑名单</th><th>Score</th><th>Method</th></tr></thead><tbody>';
+        html += '<th>文件</th><th>单元格</th><th>区域</th><th>排班姓名</th><th></th>';
+        html += '<th>黑名单姓名</th><th>分数</th><th>匹配方式</th></tr></thead><tbody>';
         for (const m of d.matches) {
           const confClass = 'conf-' + m.confidence;
-          const methodClass = 'm-' + m.method;
+          const methodLabels = {exact:'完全匹配',reversed:'词序颠倒',nospace:'无空格',token_subset:'部分包含',fuzzy:'模糊匹配',ngram:'N-gram'};
+          const methodLabel = methodLabels[m.method] || m.method;
           const barColor = m.score >= 95 ? '#22c55e' : m.score >= 85 ? '#eab308' : '#f97316';
           html += `<tr><td class="file-cell">${m.file}</td><td class="cell-ref">${m.cell}</td>`;
           html += `<td>${m.section}</td><td class="name-schedule">${m.schedule}</td>`;
           html += `<td class="arrow-cell">&harr;</td><td class="name-blacklist">${m.blacklist}</td>`;
           html += `<td><div class="score-bar"><div class="score-fill" style="width:${m.score}px;background:${barColor}"></div>${m.score}</div></td>`;
-          html += `<td><span class="method-tag ${confClass}">${m.method}</span></td></tr>`;
+          html += `<td><span class="method-tag ${confClass}">${methodLabel}</span></td></tr>`;
         }
         html += '</tbody></table></div></div>';
       } else {
-        html += '<div class="no-match-msg"><span class="big-check">&#10003;</span>All clear! No blacklist matches found. / 全部通过，未发现黑名单匹配。</div>';
+        html += '<div class="no-match-msg"><span class="big-check">&#10003;</span>全部通过，未发现黑名单匹配</div>';
       }
 
       if (d.ok_files.length > 0) {
-        html += '<div class="ok-files"><h3>No Match Files / 无匹配文件</h3><div class="ok-list">';
+        html += '<div class="ok-files"><h3>无匹配文件</h3><div class="ok-list">';
         for (const f of d.ok_files) {
           html += `<span class="ok-tag">&#10003; ${f}</span>`;
         }
@@ -479,10 +480,10 @@ json.dumps({"data": data, "download": download_data.hex() if download_data else 
         const bytes = new Uint8Array(parsed.download.match(/.{1,2}/g).map(b => parseInt(b, 16)));
         const blob = new Blob([bytes], {type: "application/octet-stream"});
         const url = URL.createObjectURL(blob);
-        downloadEl.innerHTML = `<a class="download-link" href="${url}" download="${parsed.name}">Download ${parsed.name}</a>`;
+        downloadEl.innerHTML = `<a class="download-link" href="${url}" download="${parsed.name}">下载 ${parsed.name}</a>`;
       }
     } catch (e) {
-      resultEl.textContent = "Error: " + e.message;
+      resultEl.textContent = "错误: " + e.message;
     }
   });
 </script>
