@@ -188,7 +188,7 @@ def generate_highlighted(path: str, sheets_result: list) -> bytes:
             continue
         ws = wb[sr["sheet_name"]]
         for m in sr["matches"]:
-            cell = ws.cell(row=m["row"], col=m["col"])
+            cell = ws.cell(row=m["row"], column=m["col"])
             cell.font = red_font
             cell.fill = red_fill
 
