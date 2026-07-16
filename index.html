@@ -109,8 +109,22 @@ import io, json, re, sys
 from pathlib import Path
 import openpyxl
 from openpyxl.styles import Font, PatternFill
-from rapidfuzz import fuzz
 from unidecode import unidecode
+
+def _lev_ratio(a, b):
+    """Pure Python Levenshtein ratio (replaces rapidfuzz.fuzz.ratio)."""
+    if a == b: return 100
+    la, lb = len(a), len(b)
+    if la == 0 or lb == 0: return 0
+    prev = list(range(lb + 1))
+    for i in range(1, la + 1):
+        curr = [i] + [0] * lb
+        for j in range(1, lb + 1):
+            cost = 0 if a[i-1] == b[j-1] else 1
+            curr[j] = min(curr[j-1] + 1, prev[j] + 1, prev[j-1] + cost)
+        prev = curr
+    dist = prev[lb]
+    return int(100 * (1 - dist / max(la, lb)))
 
 DEFAULT_CONFIG = {
     "name_columns": [1, 4, 8, 11, 15, 19, 23, 28],
@@ -160,7 +174,7 @@ def match_score(sched, bl):
     shorter = sa_set if len(sa_set) <= len(sb_set) else sb_set
     longer = sb_set if len(sa_set) <= len(sb_set) else sa_set
     if shorter.issubset(longer) and len(shorter) >= 2: return 95, "medium", "token_subset"
-    ratio = fuzz.ratio(sa, sb)
+    ratio = _lev_ratio(sa, sb)
     if ratio >= _cfg["fuzzy_threshold"]: return ratio, "low", "fuzzy"
     st = ta if len(ta) <= len(tb) else tb
     lt = tb if len(ta) <= len(tb) else ta
@@ -249,7 +263,6 @@ def generate_highlighted(path, sheets_result):
       const micropip = pyodide.pyimport("micropip");
       await Promise.all([
         micropip.install("openpyxl"),
-        micropip.install("rapidfuzz"),
         micropip.install("unidecode"),
       ]);
       pyodide.runPython(checkerCode);
