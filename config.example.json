@@ -1,0 +1,16 @@
+{
+  "name_columns": [1, 4, 8, 11, 15, 19, 23, 28],
+  "sections": {
+    "1": "Escaneadoras",
+    "4": "Mesas",
+    "8": "Name List",
+    "11": "Name/Time1",
+    "15": "Name/Time2",
+    "19": "Morning List",
+    "23": "Name3",
+    "28": "Name4"
+  },
+  "fuzzy_threshold": 85,
+  "ngram_threshold": 0.70,
+  "blacklist_sheet": "Blacklist"
+}

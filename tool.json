@@ -1,0 +1,14 @@
+{
+  "id": "blacklist-checker",
+  "name": "Blacklist Checker / 分拣员工黑名单检查",
+  "description": "Upload blacklist + schedule files. 6-layer name matching. Only exports files with matches. First file = blacklist, rest = schedules.",
+  "icon": "🚫",
+  "category": "Data Validation",
+  "script": "checker.py",
+  "accept": ".xlsx,.xls",
+  "acceptMultiple": true,
+  "outputPattern": "*_blacklist_check.xlsx",
+  "extraFiles": [],
+  "fileParams": [],
+  "params": []
+}
